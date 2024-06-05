@@ -229,13 +229,14 @@ class EncodingLevel(nn.Module):
         # exclude leaf
 
         if self.if_leaf == True:
-            return ([th.Tensor(),],[]) if mode=='full' else [th.Tensor(),]
+            return ([th.Tensor(),],[],[]) if mode=='full' else [th.Tensor(),]
             
 
         if self.next_level is None:
             code_list = [None for _ in range(len(n_ids))] 
             if mode == 'full':
                 modules_list = [None for _ in range(len(n_ids))] 
+                subgraph_list = [None for _ in range(len(n_ids))]
 
             for com in range(self.comms_cnt):
                 indices = th.where(th.eq(self.comms_nodes[com][:, None], n_ids))[1]
@@ -246,6 +247,7 @@ class EncodingLevel(nn.Module):
                         for i in indices:
                             code_list[i] = self.sub_emb[com].unsqueeze(0)
                             modules_list[i] = [self,]
+                            subgraph_list[i] = [self.comms_subgraph[com],]
                     else:
                         for i in indices:
                             code_list[i] = self.sub_emb[com].unsqueeze(0)
@@ -256,7 +258,8 @@ class EncodingLevel(nn.Module):
         else:
             code_list = [None for _ in range(len(n_ids))] 
             if mode == 'full':
-                modules_list = [None for _ in range(len(n_ids))] 
+                modules_list = [None for _ in range(len(n_ids))]
+                subgraph_list = [None for _ in range(len(n_ids))] 
 
             
             for com in range(self.comms_cnt):
@@ -265,18 +268,21 @@ class EncodingLevel(nn.Module):
                 
                 if indices.shape[0] > 0:
                     if mode == 'full':
-                        next_code_list,next_modules_list = self.next_level[com].query(new_n_ids,mode)
+                        next_code_list,next_modules_list,next_subgraph_list = self.next_level[com].query(new_n_ids,mode)
 
                         for i in indices:
                             code_list[i] = self.sub_emb[com].unsqueeze(0)
+                            subgraph_list = [self.comms_subgraph[com],]
                             modules_list[i] = [self,]
 
                         # code_list[indices] += next_code_list
                         modules_list[indices] += next_modules_list
+                        subgraph_list[indices] += next_subgraph_list
 
                         jj=0
                         for ii in indices:
                             modules_list[ii] += next_modules_list[jj]
+                            subgraph_list[ii] += next_subgraph_list[jj]
                             code_list[ii] = th.cat((code_list[ii],next_code_list[jj]),dim=0)
                             jj += 1
                         
@@ -292,18 +298,18 @@ class EncodingLevel(nn.Module):
                             code_list[ii] = th.cat((code_list[ii],next_code_list[jj]),dim=0)
                             jj += 1
             
-            return (code_list,modules_list) if mode=='full' else code_list
+            return (code_list,modules_list,subgraph_list) if mode=='full' else code_list
 
-    def forward(self,x):
-        # encoding feature x  
+    # def forward(self,num_enc_tree_level,):
+    #     # encoding feature x  
 
         
-        return
+    #     return
 
 
 
 
-def my_test():
+def my_test(temp_graph):
     subgraphenc = SG_Encoder(
         in_dim = 4,
         hid_dim = 16,
@@ -333,20 +339,14 @@ def my_test():
     for each in fincode:
         print(each)
         print(each.shape)
-
-
     
 
+
+
+
+
 if __name__ == '__main__':
-    from torch_geometric.datasets import FakeDataset,RandomPartitionGraphDataset
-    seed_everything(42)
-    temp_dataset = FakeDataset(num_graphs=1,avg_num_nodes=60,avg_degree=3.5,num_channels=4,
-                             edge_dim=1,num_classes=4,is_undirected=True)
-    temp_graph = temp_dataset.generate_data()
-    temp_graph.n_id = th.tensor(range(0,temp_graph.num_nodes))
-
     my_test()
-
     
 
         
